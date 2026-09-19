@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Diario Alimentare</title>
+  <title>Diario Alimentare v1.3.0</title>
 
   <!-- PWA MANIFEST & MOBILE WEB APP METADATA -->
   <link rel="manifest" href="manifest.json">
@@ -83,7 +83,10 @@
       <div class="flex items-center gap-2.5">
         <img src="icon.svg" alt="Logo" class="w-9 h-9 rounded-xl shadow-md shadow-brand-600/20 object-cover">
         <div>
-          <h1 class="font-bold text-slate-900 text-lg leading-tight">Diario Alimentare</h1>
+          <div class="flex items-center gap-1.5">
+            <h1 class="font-bold text-slate-900 text-lg leading-tight">Diario Alimentare</h1>
+            <span onclick="forceAppUpdate()" title="Clicca per forzare l'aggiornamento" class="cursor-pointer bg-brand-100 text-brand-800 font-bold text-[10px] px-1.5 py-0.5 rounded-md hover:bg-brand-200 transition">v1.3.0</span>
+          </div>
           <p class="text-xs text-slate-500 font-medium">I tuoi pasti quotidiani</p>
         </div>
       </div>
@@ -155,6 +158,15 @@
         <p class="text-sm font-medium">Caricamento diario...</p>
       </div>
     </div>
+
+    <!-- FOOTER CON VERSIONE E FORCE UPDATE -->
+    <footer class="mt-8 text-center pb-6 text-slate-400 text-xs space-y-1">
+      <p class="font-medium">Diario Alimentare PWA <span class="font-bold text-slate-600">v1.3.0</span></p>
+      <button onclick="forceAppUpdate()" class="text-[11px] font-semibold text-brand-600 hover:underline flex items-center justify-center gap-1 mx-auto">
+        <i class="fa-solid fa-rotate"></i> Verifica / Forza Aggiornamento
+      </button>
+    </footer>
+
   </main>
 
   <!-- FLOATING ACTION BUTTON PER SMARTPHONE -->
@@ -420,11 +432,32 @@
         navigator.serviceWorker.register('./sw.js')
           .then(reg => {
             console.log('Service Worker registrato con successo:', reg.scope);
-            // Forza aggiornamento immediato della cache
             reg.update();
           })
           .catch(err => console.log('Registrazione Service Worker fallita:', err));
       });
+    }
+
+    async function forceAppUpdate() {
+      if (confirm("Vuoi verificare e forzare l'aggiornamento all'ultima versione da GitHub?")) {
+        try {
+          if ('serviceWorker' in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            for (let reg of registrations) {
+              await reg.unregister();
+            }
+          }
+          if ('caches' in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map(k => caches.delete(k)));
+          }
+          alert("Cache cancellata! Ricaricamento dell'applicazione...");
+          window.location.reload(true);
+        } catch (err) {
+          console.error(err);
+          window.location.reload(true);
+        }
+      }
     }
 
     window.addEventListener('beforeinstallprompt', (e) => {
