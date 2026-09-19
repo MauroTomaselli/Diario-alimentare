@@ -1,4 +1,4 @@
-const CACHE_NAME = 'diario-alimentare-v1';
+const CACHE_NAME = 'diario-alimentare-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -23,6 +23,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
+            console.log('Eliminazione vecchia cache:', cacheName);
             return caches.delete(cacheName);
           }
         })

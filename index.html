@@ -392,8 +392,8 @@
     </div>
   </div>
 
-  <!-- CONTAINER NASCOSTO PER RENDERING E GENERAZIONE PDF -->
-  <div id="pdfExportContainer" class="hidden"></div>
+  <!-- CONTAINER OFFSCREEN PER RENDERING E GENERAZIONE PDF (NON NASCOSTO PER DARE DIMENSIONI AD HTML2CANVAS) -->
+  <div id="pdfExportContainer" style="position: absolute; left: -9999px; top: 0; width: 750px; background-color: #ffffff;"></div>
 
 
   <!-- ==================== JAVASCRIPT LOGIC ==================== -->
@@ -430,7 +430,6 @@
       }
     }
 
-    // Rileva iOS per mostrare banner guida installazione se aperta in Safari mobile
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
     if (isIOS && !isStandalone) {
@@ -802,7 +801,7 @@
         document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-pen text-brand-600"></i> Modifica Pasto';
         document.getElementById('mealId').value = mealToEdit.id;
         document.getElementById('mealDateTime').value = mealToEdit.datetime;
-        document.getElementById('mealWeight').value = mealToEdit.weight !== undefined ? mealToEdit.weight : '';
+        document.getElementById('mealWeight').value = mealToEdit.weight !== undefined && mealToEdit.weight !== null ? mealToEdit.weight : '';
         document.getElementById('mealDescription').value = mealToEdit.description;
         
         selectMood(mealToEdit.mood);
@@ -1179,7 +1178,7 @@
     }
 
     // -------------------------------------------------------------
-    // ESPORTAZIONE PDF
+    // ESPORTAZIONE PDF CORRETTA E RIGOROSA
     // -------------------------------------------------------------
     function openExportModal() {
       document.getElementById('exportModal').classList.remove('hidden');
@@ -1217,7 +1216,7 @@
         const pdfContainer = document.getElementById('pdfExportContainer');
         
         let pdfHTML = `
-          <div style="font-family: Arial, sans-serif; padding: 25px; color: #0f172a; max-width: 800px; margin: auto; background-color: #ffffff;">
+          <div style="font-family: Arial, sans-serif; padding: 25px; color: #0f172a; width: 720px; background-color: #ffffff;">
             <!-- INTESTAZIONE PDF -->
             <div style="text-align: center; border-bottom: 3px solid #16a34a; padding-bottom: 15px; margin-bottom: 25px;">
               <h1 style="color: #15803d; margin: 0; font-size: 26px; font-weight: bold; letter-spacing: 0.5px;">DIARIO ALIMENTARE</h1>
@@ -1252,7 +1251,7 @@
             const contextsStr = Array.isArray(meal.context) ? meal.context.join(', ') : meal.context;
             
             pdfHTML += `
-              <div style="border: 1px solid #cbd5e1; border-radius: 10px; padding: 14px; background: #ffffff; display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+              <div style="border: 1px solid #cbd5e1; border-radius: 10px; padding: 14px; background: #ffffff; display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); page-break-inside: avoid;">
                 
                 <div style="flex: 1; min-width: 0;">
                   <div style="margin-bottom: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
@@ -1260,7 +1259,7 @@
                       ⏰ ${timeStr}
                     </span>
                     
-                    ${meal.weight ? `
+                    ${(meal.weight !== null && meal.weight !== undefined) ? `
                       <span style="font-size: 14px; font-weight: bold; color: #0369a1; background-color: #f0f9ff; border: 1px solid #bae6fd; padding: 3px 8px; border-radius: 6px;">
                         ⚖️ ${meal.weight} kg
                       </span>
@@ -1270,7 +1269,7 @@
                       ${meal.mood}
                     </span>
 
-                    <span style="font-size: 13px; font-weight: font-medium; color: #334155; background-color: #f1f5f9; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 6px;">
+                    <span style="font-size: 13px; font-weight: 500; color: #334155; background-color: #f1f5f9; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 6px;">
                       ${contextsStr}
                     </span>
                   </div>
@@ -1281,8 +1280,8 @@
                 </div>
 
                 ${(includePhotos && meal.photo) ? `
-                  <div style="width: 150px; flex-shrink: 0; text-align: right;">
-                    <img src="${meal.photo}" style="width: 150px; height: 110px; object-fit: cover; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 1px 3px rgba(0,0,0,0.1);" />
+                  <div style="width: 140px; flex-shrink: 0; text-align: right;">
+                    <img src="${meal.photo}" style="width: 140px; height: 105px; object-fit: cover; border-radius: 8px; border: 1px solid #cbd5e1;" />
                   </div>
                 ` : ''}
 
@@ -1290,7 +1289,7 @@
             `;
           });
 
-          html += `
+          pdfHTML += `
               </div>
             </div>
           `;
@@ -1300,20 +1299,29 @@
 
         pdfContainer.innerHTML = pdfHTML;
 
+        // Attendi che le immagini nel PDF siano caricate in memoria
+        const imgs = pdfContainer.querySelectorAll('img');
+        if (imgs.length > 0) {
+          await Promise.all(Array.from(imgs).map(img => {
+            if (img.complete) return Promise.resolve();
+            return new Promise(res => { img.onload = res; img.onerror = res; });
+          }));
+        }
+
         const opt = {
-          margin:       0.4,
+          margin:       0.3,
           filename:     `diario_alimentare_${new Date().toISOString().slice(0, 10)}.pdf`,
-          image:        { type: 'jpeg', quality: 0.95 },
-          html2canvas:  { scale: 2, useCORS: true },
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2, useCORS: true, allowTaint: true, logging: false },
           jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
         };
 
-        await html2pdf().set(opt).from(pdfContainer.children[0]).save();
+        await html2pdf().set(opt).from(pdfContainer).save();
 
         closeExportModal();
       } catch (err) {
         console.error("Errore generazione PDF:", err);
-        alert("Si è verificato un errore durante la generazione del PDF.");
+        alert("Si è verificato un errore durante la generazione del PDF. Dettagli: " + (err.message || err));
       } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-download"></i> Scarica Documento PDF';
