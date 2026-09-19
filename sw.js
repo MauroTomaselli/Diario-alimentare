@@ -1,31 +1,16 @@
-const CACHE_NAME = 'diario-alimentare-v2';
-const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
-  './icon.svg'
-];
+const CACHE_NAME = 'diario-alimentare-v3';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
-  );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    caches.keys().then((keys) => {
       return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Eliminazione vecchia cache:', cacheName);
-            return caches.delete(cacheName);
-          }
+        keys.map((key) => {
+          console.log('Cancellazione cache obsoleta:', key);
+          return caches.delete(key);
         })
       );
     })
@@ -33,16 +18,33 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Network-First per index.html e navigazione così gli aggiornamenti si caricano SUBITO
 self.addEventListener('fetch', (event) => {
+  if (event.request.mode === 'navigate' || event.request.url.includes('index.html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const cloned = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
+          return response;
+        })
+        .catch(() => caches.match(event.request) || caches.match('./index.html'))
+    );
+    return;
+  }
+
+  // Cache-First per risorse statiche (icone, manifest)
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
         return cachedResponse;
       }
-      return fetch(event.request).catch(() => {
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
+      return fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const cloned = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
         }
+        return networkResponse;
       });
     })
   );

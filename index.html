@@ -58,10 +58,20 @@
     .rotate-icon.open {
       transform: rotate(180deg);
     }
-    /* Stili per la stampa/esportazione PDF */
+
+    /* REGOLA PER STAMPA NATIVA / SALVATAGGIO PDF */
     @media print {
-      .no-print { display: none !important; }
-      body { background: white; color: black; }
+      body > *:not(#pdfExportContainer) {
+        display: none !important;
+      }
+      #pdfExportContainer {
+        display: block !important;
+        position: static !important;
+        width: 100% !important;
+        left: 0 !important;
+        top: 0 !important;
+        background: white !important;
+      }
     }
   </style>
 </head>
@@ -79,7 +89,7 @@
       </div>
       
       <div class="flex items-center gap-2">
-        <!-- PULSANTE INSTALLA APP (VISIBILE QUANDO DISPONIBILE) -->
+        <!-- PULSANTE INSTALLA APP -->
         <button id="btnInstallPWA" onclick="installPWA()" class="hidden px-2.5 py-1.5 text-xs font-bold rounded-lg bg-brand-600 hover:bg-brand-700 text-white transition flex items-center gap-1.5 shadow-md shadow-brand-600/20 active:scale-95">
           <i class="fa-solid fa-download"></i>
           <span>Installa</span>
@@ -93,7 +103,7 @@
     </div>
   </header>
 
-  <!-- BANNER GUIDA INSTALLAZIONE PER SMARTPHONE / IOS -->
+  <!-- BANNER GUIDA INSTALLAZIONE IOS -->
   <div id="pwaBannerIOS" class="hidden max-w-md mx-auto px-4 pt-3">
     <div class="bg-brand-50 border border-brand-200 rounded-2xl p-3 flex items-center justify-between gap-3 text-xs text-brand-900 shadow-sm">
       <div class="flex items-center gap-2">
@@ -140,7 +150,6 @@
 
     <!-- FEED CONTAINER -->
     <div id="feedContainer" class="space-y-4">
-      <!-- Caricamento dinamico tramite JS -->
       <div class="text-center py-12 text-slate-400">
         <i class="fa-solid fa-circle-notch fa-spin text-2xl mb-2 text-brand-500"></i>
         <p class="text-sm font-medium">Caricamento diario...</p>
@@ -199,7 +208,7 @@
             </div>
           </div>
 
-          <!-- 2. FOTO DEL PASTO (CON COMPRESSIONE AUTOMATICA) -->
+          <!-- 2. FOTO DEL PASTO -->
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
               Foto del Pasto
@@ -250,7 +259,6 @@
               </button>
             </div>
             <div id="moodChipsContainer" class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1 bg-slate-50 border border-slate-200 rounded-xl">
-              <!-- Renderizzato dinamicamente -->
             </div>
             <input type="hidden" id="selectedMood" value="😊 Sereno" required>
           </div>
@@ -266,7 +274,6 @@
               </button>
             </div>
             <div id="contextChipsContainer" class="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-slate-50 border border-slate-200 rounded-xl">
-              <!-- Renderizzato dinamicamente con selezione multipla -->
             </div>
           </div>
 
@@ -383,17 +390,22 @@
         <label for="exportIncludePhotos" class="text-xs font-medium text-slate-700">Includi foto dei pasti affiancate sulla destra</label>
       </div>
 
-      <div class="pt-2">
-        <button onclick="generatePDF()" id="btnGeneratePDF" class="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-600/30 transition flex items-center justify-center gap-2 text-sm">
-          <i class="fa-solid fa-download"></i>
-          <span>Scarica Documento PDF</span>
+      <div class="space-y-2 pt-2">
+        <button onclick="generatePDF(false)" id="btnGeneratePDF" class="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-600/30 transition flex items-center justify-center gap-2 text-sm">
+          <i class="fa-solid fa-file-arrow-down"></i>
+          <span>Scarica PDF Diretto</span>
+        </button>
+
+        <button onclick="generatePDF(true)" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition flex items-center justify-center gap-2 text-xs border border-slate-200">
+          <i class="fa-solid fa-print"></i>
+          <span>Stampa / Salva in PDF (Sistema)</span>
         </button>
       </div>
     </div>
   </div>
 
-  <!-- CONTAINER OFFSCREEN PER RENDERING E GENERAZIONE PDF (NON NASCOSTO PER DARE DIMENSIONI AD HTML2CANVAS) -->
-  <div id="pdfExportContainer" style="position: absolute; left: -9999px; top: 0; width: 750px; background-color: #ffffff;"></div>
+  <!-- CONTAINER OFFSCREEN PER RENDERING E GENERAZIONE PDF -->
+  <div id="pdfExportContainer" style="position: fixed; top: 0; left: 0; z-index: -9999; opacity: 0.01; width: 750px; background-color: #ffffff; pointer-events: none;"></div>
 
 
   <!-- ==================== JAVASCRIPT LOGIC ==================== -->
@@ -406,7 +418,11 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
-          .then(reg => console.log('Service Worker registrato con successo:', reg.scope))
+          .then(reg => {
+            console.log('Service Worker registrato con successo:', reg.scope);
+            // Forza aggiornamento immediato della cache
+            reg.update();
+          })
           .catch(err => console.log('Registrazione Service Worker fallita:', err));
       });
     }
@@ -1055,7 +1071,7 @@
                     <span class="bg-brand-50 text-brand-700 border border-brand-200/60 font-bold text-[11px] px-2 py-0.5 rounded-lg flex items-center gap-1">
                       <i class="fa-regular fa-clock text-[10px]"></i> ${timeStr}
                     </span>
-                    ${meal.weight ? `
+                    ${(meal.weight !== null && meal.weight !== undefined && meal.weight !== '') ? `
                       <span class="bg-sky-50 text-sky-700 border border-sky-200/60 font-bold text-[11px] px-2 py-0.5 rounded-lg flex items-center gap-1">
                         <i class="fa-solid fa-weight-scale text-[10px]"></i> ${meal.weight} kg
                       </span>
@@ -1178,7 +1194,7 @@
     }
 
     // -------------------------------------------------------------
-    // ESPORTAZIONE PDF CORRETTA E RIGOROSA
+    // ESPORTAZIONE PDF CON DOPPIA MODALITÀ & FALLBACK DI STAMPA NATIVA
     // -------------------------------------------------------------
     function openExportModal() {
       document.getElementById('exportModal').classList.remove('hidden');
@@ -1188,13 +1204,13 @@
       document.getElementById('exportModal').classList.add('hidden');
     }
 
-    async function generatePDF() {
+    async function generatePDF(useNativePrint = false) {
       const weeksVal = document.getElementById('exportWeeksSelect').value;
       const includePhotos = document.getElementById('exportIncludePhotos').checked;
       const btn = document.getElementById('btnGeneratePDF');
 
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generazione PDF in corso...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparazione...';
 
       try {
         let meals = await getAllMealsFromDB();
@@ -1209,14 +1225,14 @@
         if (meals.length === 0) {
           alert("Nessun pasto trovato nell'intervallo di tempo selezionato.");
           btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-download"></i> Scarica Documento PDF';
+          btn.innerHTML = '<i class="fa-solid fa-file-arrow-down"></i> Scarica PDF Diretto';
           return;
         }
 
         const pdfContainer = document.getElementById('pdfExportContainer');
         
         let pdfHTML = `
-          <div style="font-family: Arial, sans-serif; padding: 25px; color: #0f172a; width: 720px; background-color: #ffffff;">
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #0f172a; width: 100%; max-width: 720px; margin: auto; background-color: #ffffff;">
             <!-- INTESTAZIONE PDF -->
             <div style="text-align: center; border-bottom: 3px solid #16a34a; padding-bottom: 15px; margin-bottom: 25px;">
               <h1 style="color: #15803d; margin: 0; font-size: 26px; font-weight: bold; letter-spacing: 0.5px;">DIARIO ALIMENTARE</h1>
@@ -1259,7 +1275,7 @@
                       ⏰ ${timeStr}
                     </span>
                     
-                    ${(meal.weight !== null && meal.weight !== undefined) ? `
+                    ${(meal.weight !== null && meal.weight !== undefined && meal.weight !== '') ? `
                       <span style="font-size: 14px; font-weight: bold; color: #0369a1; background-color: #f0f9ff; border: 1px solid #bae6fd; padding: 3px 8px; border-radius: 6px;">
                         ⚖️ ${meal.weight} kg
                       </span>
@@ -1299,7 +1315,7 @@
 
         pdfContainer.innerHTML = pdfHTML;
 
-        // Attendi che le immagini nel PDF siano caricate in memoria
+        // Attendi che le immagini siano in memoria
         const imgs = pdfContainer.querySelectorAll('img');
         if (imgs.length > 0) {
           await Promise.all(Array.from(imgs).map(img => {
@@ -1308,23 +1324,37 @@
           }));
         }
 
-        const opt = {
-          margin:       0.3,
-          filename:     `diario_alimentare_${new Date().toISOString().slice(0, 10)}.pdf`,
-          image:        { type: 'jpeg', quality: 0.98 },
-          html2canvas:  { scale: 2, useCORS: true, allowTaint: true, logging: false },
-          jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-        };
+        if (useNativePrint) {
+          closeExportModal();
+          setTimeout(() => { window.print(); }, 300);
+        } else {
+          if (typeof html2pdf === 'undefined') {
+            closeExportModal();
+            setTimeout(() => { window.print(); }, 300);
+            return;
+          }
 
-        await html2pdf().set(opt).from(pdfContainer).save();
+          const opt = {
+            margin:       0.3,
+            filename:     `diario_alimentare_${new Date().toISOString().slice(0, 10)}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true, allowTaint: true, logging: false },
+            jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+          };
 
-        closeExportModal();
+          await html2pdf().set(opt).from(pdfContainer).save();
+          closeExportModal();
+        }
+
       } catch (err) {
         console.error("Errore generazione PDF:", err);
-        alert("Si è verificato un errore durante la generazione del PDF. Dettagli: " + (err.message || err));
+        if (confirm("Non è stato possibile scaricare direttamente il PDF. Vuoi usare la funzione di Stampa/Salva PDF nativa del tuo telefono?")) {
+          closeExportModal();
+          setTimeout(() => { window.print(); }, 300);
+        }
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-download"></i> Scarica Documento PDF';
+        btn.innerHTML = '<i class="fa-solid fa-file-arrow-down"></i> Scarica PDF Diretto';
       }
     }
   </script>
