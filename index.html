@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Diario Alimentare v1.3.0</title>
+  <title>Diario Alimentare v1.4.0</title>
 
   <!-- PWA MANIFEST & MOBILE WEB APP METADATA -->
   <link rel="manifest" href="manifest.json">
@@ -70,6 +70,8 @@
         width: 100% !important;
         left: 0 !important;
         top: 0 !important;
+        opacity: 1 !important;
+        z-index: 99999 !important;
         background: white !important;
       }
     }
@@ -85,7 +87,7 @@
         <div>
           <div class="flex items-center gap-1.5">
             <h1 class="font-bold text-slate-900 text-lg leading-tight">Diario Alimentare</h1>
-            <span onclick="forceAppUpdate()" title="Clicca per forzare l'aggiornamento" class="cursor-pointer bg-brand-100 text-brand-800 font-bold text-[10px] px-1.5 py-0.5 rounded-md hover:bg-brand-200 transition">v1.3.0</span>
+            <span onclick="forceAppUpdate()" title="Clicca per forzare l'aggiornamento" class="cursor-pointer bg-brand-100 text-brand-800 font-bold text-[10px] px-1.5 py-0.5 rounded-md hover:bg-brand-200 transition">v1.4.0</span>
           </div>
           <p class="text-xs text-slate-500 font-medium">I tuoi pasti quotidiani</p>
         </div>
@@ -161,7 +163,7 @@
 
     <!-- FOOTER CON VERSIONE E FORCE UPDATE -->
     <footer class="mt-8 text-center pb-6 text-slate-400 text-xs space-y-1">
-      <p class="font-medium">Diario Alimentare PWA <span class="font-bold text-slate-600">v1.3.0</span></p>
+      <p class="font-medium">Diario Alimentare PWA <span class="font-bold text-slate-600">v1.4.0</span></p>
       <button onclick="forceAppUpdate()" class="text-[11px] font-semibold text-brand-600 hover:underline flex items-center justify-center gap-1 mx-auto">
         <i class="fa-solid fa-rotate"></i> Verifica / Forza Aggiornamento
       </button>
@@ -416,7 +418,7 @@
     </div>
   </div>
 
-  <!-- CONTAINER OFFSCREEN PER RENDERING E GENERAZIONE PDF -->
+  <!-- CONTAINER OFFSCREEN PER RENDERING E GENERAZIONE PDF (OPACITY DINAMICA IN JS PER PERMETTERE CATTURA COMPLETA) -->
   <div id="pdfExportContainer" style="position: fixed; top: 0; left: 0; z-index: -9999; opacity: 0.01; width: 750px; background-color: #ffffff; pointer-events: none;"></div>
 
 
@@ -1227,7 +1229,7 @@
     }
 
     // -------------------------------------------------------------
-    // ESPORTAZIONE PDF CON DOPPIA MODALITÀ & FALLBACK DI STAMPA NATIVA
+    // ESPORTAZIONE PDF CON CORREZIONE OPACITÀ HTML2CANVAS & OPZIONE STAMPA
     // -------------------------------------------------------------
     function openExportModal() {
       document.getElementById('exportModal').classList.remove('hidden');
@@ -1243,7 +1245,9 @@
       const btn = document.getElementById('btnGeneratePDF');
 
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparazione...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparazione PDF...';
+
+      const pdfContainer = document.getElementById('pdfExportContainer');
 
       try {
         let meals = await getAllMealsFromDB();
@@ -1262,10 +1266,8 @@
           return;
         }
 
-        const pdfContainer = document.getElementById('pdfExportContainer');
-        
         let pdfHTML = `
-          <div style="font-family: Arial, sans-serif; padding: 20px; color: #0f172a; width: 100%; max-width: 720px; margin: auto; background-color: #ffffff;">
+          <div id="pdfContentWrapper" style="font-family: Arial, sans-serif; padding: 25px; color: #0f172a; width: 700px; background-color: #ffffff; opacity: 1;">
             <!-- INTESTAZIONE PDF -->
             <div style="text-align: center; border-bottom: 3px solid #16a34a; padding-bottom: 15px; margin-bottom: 25px;">
               <h1 style="color: #15803d; margin: 0; font-size: 26px; font-weight: bold; letter-spacing: 0.5px;">DIARIO ALIMENTARE</h1>
@@ -1348,8 +1350,13 @@
 
         pdfContainer.innerHTML = pdfHTML;
 
-        // Attendi che le immagini siano in memoria
-        const imgs = pdfContainer.querySelectorAll('img');
+        // Impostiamo opacità piena durante l'elaborazione così html2canvas non genera una pagina trasparente/vuota
+        pdfContainer.style.opacity = '1';
+        pdfContainer.style.zIndex = '99999';
+
+        const targetEl = document.getElementById('pdfContentWrapper') || pdfContainer;
+
+        const imgs = targetEl.querySelectorAll('img');
         if (imgs.length > 0) {
           await Promise.all(Array.from(imgs).map(img => {
             if (img.complete) return Promise.resolve();
@@ -1359,7 +1366,11 @@
 
         if (useNativePrint) {
           closeExportModal();
-          setTimeout(() => { window.print(); }, 300);
+          setTimeout(() => {
+            window.print();
+            pdfContainer.style.opacity = '0.01';
+            pdfContainer.style.zIndex = '-9999';
+          }, 300);
         } else {
           if (typeof html2pdf === 'undefined') {
             closeExportModal();
@@ -1375,16 +1386,20 @@
             jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
           };
 
-          await html2pdf().set(opt).from(pdfContainer).save();
+          await html2pdf().set(opt).from(targetEl).save();
+          
+          pdfContainer.style.opacity = '0.01';
+          pdfContainer.style.zIndex = '-9999';
           closeExportModal();
         }
 
       } catch (err) {
         console.error("Errore generazione PDF:", err);
-        if (confirm("Non è stato possibile scaricare direttamente il PDF. Vuoi usare la funzione di Stampa/Salva PDF nativa del tuo telefono?")) {
-          closeExportModal();
-          setTimeout(() => { window.print(); }, 300);
-        }
+        pdfContainer.style.opacity = '0.01';
+        pdfContainer.style.zIndex = '-9999';
+        alert("Errore generazione PDF. Tentativo con la stampa di sistema...");
+        closeExportModal();
+        setTimeout(() => { window.print(); }, 300);
       } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-file-arrow-down"></i> Scarica PDF Diretto';

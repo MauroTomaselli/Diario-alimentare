@@ -1,4 +1,4 @@
-const CACHE_NAME = 'diario-alimentare-v3';
+const CACHE_NAME = 'diario-alimentare-v4';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -9,7 +9,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
-          console.log('Cancellazione cache obsoleta:', key);
+          console.log('Eliminazione vecchia cache:', key);
           return caches.delete(key);
         })
       );
@@ -18,7 +18,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Network-First per index.html e navigazione così gli aggiornamenti si caricano SUBITO
+// Network-First per index.html per garantire che gli aggiornamenti si riflettano SUBITO
 self.addEventListener('fetch', (event) => {
   if (event.request.mode === 'navigate' || event.request.url.includes('index.html')) {
     event.respondWith(
@@ -33,7 +33,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-First per risorse statiche (icone, manifest)
+  // Cache-First per asset statici
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
