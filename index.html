@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Diario Alimentare</title>
+
+  <!-- PWA MANIFEST & MOBILE WEB APP METADATA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#16a34a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Diario Food">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- html2pdf.js per esportazione PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              800: '#166534',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Transizioni ed effetti per accordion */
+    .accordion-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s cubic-bezier(0, 1, 0, 1);
+    }
+    .accordion-content.active {
+      max-height: 5000px;
+      transition: max-height 0.5s ease-in-out;
+    }
+    .rotate-icon {
+      transition: transform 0.25s ease;
+    }
+    .rotate-icon.open {
+      transform: rotate(180deg);
+    }
+    /* Stili per la stampa/esportazione PDF */
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white; color: black; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen pb-24 antialiased selection:bg-brand-500 selection:text-white">
+
+  <!-- TOP APP BAR -->
+  <header class="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm">
+    <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <img src="icon.svg" alt="Logo" class="w-9 h-9 rounded-xl shadow-md shadow-brand-600/20 object-cover">
+        <div>
+          <h1 class="font-bold text-slate-900 text-lg leading-tight">Diario Alimentare</h1>
+          <p class="text-xs text-slate-500 font-medium">I tuoi pasti quotidiani</p>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-2">
+        <!-- PULSANTE INSTALLA APP (VISIBILE QUANDO DISPONIBILE) -->
+        <button id="btnInstallPWA" onclick="installPWA()" class="hidden px-2.5 py-1.5 text-xs font-bold rounded-lg bg-brand-600 hover:bg-brand-700 text-white transition flex items-center gap-1.5 shadow-md shadow-brand-600/20 active:scale-95">
+          <i class="fa-solid fa-download"></i>
+          <span>Installa</span>
+        </button>
+
+        <button onclick="openExportModal()" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center gap-1.5 border border-slate-200 shadow-sm active:scale-95">
+          <i class="fa-solid fa-file-pdf text-red-500 text-sm"></i>
+          <span>PDF</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- BANNER GUIDA INSTALLAZIONE PER SMARTPHONE / IOS -->
+  <div id="pwaBannerIOS" class="hidden max-w-md mx-auto px-4 pt-3">
+    <div class="bg-brand-50 border border-brand-200 rounded-2xl p-3 flex items-center justify-between gap-3 text-xs text-brand-900 shadow-sm">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-mobile-screen-button text-brand-600 text-lg"></i>
+        <span><strong>Aggiungi a Home:</strong> premi <i class="fa-solid fa-arrow-up-from-bracket"></i> e seleziona <strong>"Aggiungi a schermata Home"</strong> per usarla come app!</span>
+      </div>
+      <button onclick="document.getElementById('pwaBannerIOS').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="max-w-md mx-auto px-4 pt-4">
+
+    <!-- BARRA STATISTICHE RAPIDE & PULSANTE NUOVO PASTO -->
+    <div class="mb-5 bg-gradient-to-br from-brand-600 to-emerald-700 text-white p-4 rounded-2xl shadow-lg shadow-brand-600/20">
+      <div class="flex justify-between items-center mb-3">
+        <div>
+          <span class="text-xs font-medium uppercase tracking-wider text-brand-100">Oggi</span>
+          <h2 id="todayDateStr" class="text-lg font-bold">--</h2>
+        </div>
+        <div id="todayCountBadge" class="bg-white/20 backdrop-blur-md text-white text-xs font-bold px-3 py-1 rounded-full border border-white/20">
+          0 Pasti
+        </div>
+      </div>
+      
+      <button onclick="openMealModal()" class="w-full py-3 bg-white text-brand-700 font-bold rounded-xl shadow-md hover:bg-brand-50 active:scale-[0.98] transition flex items-center justify-center gap-2 text-sm">
+        <i class="fa-solid fa-circle-plus text-base text-brand-600"></i>
+        <span>Aggiungi Pasto</span>
+      </button>
+    </div>
+
+    <!-- SEZIONE DIARIO / FEED (STRUTTURA AD FISARMONICA) -->
+    <div class="flex items-center justify-between mb-3 px-1">
+      <h2 class="font-bold text-slate-800 text-base flex items-center gap-2">
+        <i class="fa-solid fa-clock-rotate-left text-brand-600 text-sm"></i>
+        <span>Cronologia Pasti</span>
+      </h2>
+      <button onclick="toggleExpandAll()" id="btnToggleAll" class="text-xs font-semibold text-brand-700 hover:text-brand-800">
+        Espandi tutto
+      </button>
+    </div>
+
+    <!-- FEED CONTAINER -->
+    <div id="feedContainer" class="space-y-4">
+      <!-- Caricamento dinamico tramite JS -->
+      <div class="text-center py-12 text-slate-400">
+        <i class="fa-solid fa-circle-notch fa-spin text-2xl mb-2 text-brand-500"></i>
+        <p class="text-sm font-medium">Caricamento diario...</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- FLOATING ACTION BUTTON PER SMARTPHONE -->
+  <button onclick="openMealModal()" class="fixed right-5 bottom-6 z-40 w-14 h-14 bg-brand-600 hover:bg-brand-700 text-white rounded-full shadow-xl shadow-brand-600/40 flex items-center justify-center text-xl transition active:scale-95 focus:outline-none">
+    <i class="fa-solid fa-plus"></i>
+  </button>
+
+  <!-- ==================== MODALE AGGIUNGI / MODIFICA PASTO ==================== -->
+  <div id="mealModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity">
+    <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
+      
+      <!-- Modal Header -->
+      <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <h3 id="modalTitle" class="font-bold text-slate-900 text-base flex items-center gap-2">
+          <i class="fa-solid fa-utensils text-brand-600"></i>
+          <span>Nuova Nota Pasto</span>
+        </h3>
+        <button onclick="closeMealModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Modal Form Body -->
+      <div class="p-5 overflow-y-auto space-y-5 text-sm">
+        <form id="mealForm" onsubmit="saveMeal(event)" class="space-y-5">
+          <input type="hidden" id="mealId" value="">
+
+          <!-- 1. DATA, ORA & PESO OPZIONALE -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Data e Ora <span class="text-slate-400 font-normal">(Auto)</span>
+              </label>
+              <div class="relative">
+                <i class="fa-regular fa-calendar-clock absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input type="datetime-local" id="mealDateTime" required
+                  class="w-full pl-9 pr-2 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs text-slate-800 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none">
+              </div>
+            </div>
+
+            <!-- PESO CORPOREO / PASTO (OPZIONALE) -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Peso (kg) <span class="text-slate-400 font-normal">(Opzionale)</span>
+              </label>
+              <div class="relative">
+                <i class="fa-solid fa-weight-scale absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input type="number" step="0.1" id="mealWeight" placeholder="Es. 70.5"
+                  class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs text-slate-800 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none">
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. FOTO DEL PASTO (CON COMPRESSIONE AUTOMATICA) -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Foto del Pasto
+            </label>
+            <div id="photoUploadContainer" class="border-2 border-dashed border-slate-200 rounded-2xl p-4 text-center hover:border-brand-400 transition bg-slate-50 relative">
+              
+              <input type="file" id="mealPhotoInput" accept="image/*" capture="environment" class="hidden" onchange="handlePhotoSelect(event)">
+              
+              <div id="uploadPlaceholder" class="space-y-2">
+                <div class="w-12 h-12 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center mx-auto">
+                  <i class="fa-solid fa-camera text-xl"></i>
+                </div>
+                <div>
+                  <button type="button" onclick="document.getElementById('mealPhotoInput').click()" class="text-xs font-bold text-brand-600 hover:underline">
+                    Scatta foto o Scegli dalla Galleria
+                  </button>
+                  <p class="text-[11px] text-slate-400 mt-0.5">Risoluzione limitata in automatico a max 800px</p>
+                </div>
+              </div>
+
+              <!-- Preview Foto -->
+              <div id="photoPreviewContainer" class="hidden relative rounded-xl overflow-hidden group">
+                <img id="photoPreview" src="" alt="Anteprima pasto" class="w-full h-44 object-cover rounded-xl shadow-inner">
+                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
+                  <button type="button" onclick="document.getElementById('mealPhotoInput').click()" class="p-2 bg-white text-slate-800 rounded-full text-xs font-bold shadow">
+                    <i class="fa-solid fa-pen"></i> Cambia
+                  </button>
+                  <button type="button" onclick="removePhoto()" class="p-2 bg-red-600 text-white rounded-full text-xs font-bold shadow">
+                    <i class="fa-solid fa-trash"></i> Rimuovi
+                  </button>
+                </div>
+                <div id="photoMetaInfo" class="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded-md backdrop-blur-sm">
+                  Compressa
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- 3. STATO MENTALE (MOOD) -->
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Stato Mentale / Emozione
+              </label>
+              <button type="button" onclick="openCustomMoodModal()" class="text-xs font-semibold text-brand-600 hover:underline flex items-center gap-1">
+                <i class="fa-solid fa-plus text-[10px]"></i> Personalizza
+              </button>
+            </div>
+            <div id="moodChipsContainer" class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1 bg-slate-50 border border-slate-200 rounded-xl">
+              <!-- Renderizzato dinamicamente -->
+            </div>
+            <input type="hidden" id="selectedMood" value="😊 Sereno" required>
+          </div>
+
+          <!-- 4. CONTESTO (SCELTA MULTIPLA + PERSONALIZZABILE) -->
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Contesto del Pasto <span class="text-slate-400 font-normal lowercase">(scelta multipla)</span>
+              </label>
+              <button type="button" onclick="openCustomContextModal()" class="text-xs font-semibold text-brand-600 hover:underline flex items-center gap-1">
+                <i class="fa-solid fa-plus text-[10px]"></i> Personalizza
+              </button>
+            </div>
+            <div id="contextChipsContainer" class="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-slate-50 border border-slate-200 rounded-xl">
+              <!-- Renderizzato dinamicamente con selezione multipla -->
+            </div>
+          </div>
+
+          <!-- 5. DESCRIZIONE (COSA MANGI) -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Cosa Mangi? (Descrizione)
+            </label>
+            <textarea id="mealDescription" rows="3" required placeholder="Es. Primo di pasta al pomodoro, insalata mista e una mela..."
+              class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none resize-none"></textarea>
+          </div>
+
+          <!-- Submit Button -->
+          <div class="pt-2">
+            <button type="submit" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-lg shadow-brand-600/30 transition active:scale-[0.98] text-sm">
+              Salva nel Diario
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODALE AGGIUNGI STATO MENTALE PERSONALIZZATO ==================== -->
+  <div id="customMoodModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-xs rounded-2xl p-5 shadow-2xl space-y-4">
+      <h4 class="font-bold text-slate-900 text-base flex items-center gap-2">
+        <span>✨ Nuova Emozione / Stato</span>
+      </h4>
+      <p class="text-xs text-slate-500">Crea un nuovo stato mentale da selezionare nei tuoi pasti.</p>
+      
+      <div>
+        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Emoji / Icona</label>
+        <input type="text" id="newMoodEmoji" placeholder="Es. 🤩, 🤯, 🍕" maxlength="4" value="✨"
+          class="w-full p-2.5 text-center text-xl bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+
+      <div>
+        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Nome Stato</label>
+        <input type="text" id="newMoodName" placeholder="Es. Soddisfatto, Energetico" required
+          class="w-full p-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+
+      <div class="flex gap-2 pt-2">
+        <button type="button" onclick="closeCustomMoodModal()" class="flex-1 py-2.5 bg-slate-100 text-slate-700 font-semibold rounded-xl text-xs">
+          Annulla
+        </button>
+        <button type="button" onclick="saveCustomMood()" class="flex-1 py-2.5 bg-brand-600 text-white font-bold rounded-xl text-xs shadow-md">
+          Aggiungi
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODALE AGGIUNGI CONTESTO PERSONALIZZATO ==================== -->
+  <div id="customContextModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-xs rounded-2xl p-5 shadow-2xl space-y-4">
+      <h4 class="font-bold text-slate-900 text-base flex items-center gap-2">
+        <span>📍 Nuovo Contesto</span>
+      </h4>
+      <p class="text-xs text-slate-500">Crea un nuovo contesto personalizzato per i tuoi pasti.</p>
+      
+      <div>
+        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Emoji / Icona</label>
+        <input type="text" id="newContextEmoji" placeholder="Es. 🚗, 📺, 🎉" maxlength="4" value="📍"
+          class="w-full p-2.5 text-center text-xl bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+
+      <div>
+        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Nome Contesto</label>
+        <input type="text" id="newContextName" placeholder="Es. In auto, Davanti alla TV" required
+          class="w-full p-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+
+      <div class="flex gap-2 pt-2">
+        <button type="button" onclick="closeCustomContextModal()" class="flex-1 py-2.5 bg-slate-100 text-slate-700 font-semibold rounded-xl text-xs">
+          Annulla
+        </button>
+        <button type="button" onclick="saveCustomContext()" class="flex-1 py-2.5 bg-brand-600 text-white font-bold rounded-xl text-xs shadow-md">
+          Aggiungi
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODALE ESPORTAZIONE PDF ==================== -->
+  <div id="exportModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+          <i class="fa-solid fa-file-pdf text-red-500"></i>
+          <span>Esporta Diario in PDF</span>
+        </h3>
+        <button onclick="closeExportModal()" class="text-slate-400 hover:text-slate-600">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-600">Seleziona quante settimane di diario desideri includere nel documento PDF esportato.</p>
+
+      <div class="space-y-2">
+        <label class="block text-xs font-bold text-slate-700 uppercase">Intervallo di Tempo</label>
+        <select id="exportWeeksSelect" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-sm text-slate-800 outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="1">Ultima 1 Settimana</option>
+          <option value="2">Ultime 2 Settimane</option>
+          <option value="4" selected>Ultime 4 Settimane (1 Mese)</option>
+          <option value="12">Ultime 12 Settimane</option>
+          <option value="all">Tutto il Diario (Tutte le Settimane)</option>
+        </select>
+      </div>
+
+      <div class="flex items-center gap-2 pt-1">
+        <input type="checkbox" id="exportIncludePhotos" checked class="w-4 h-4 text-brand-600 rounded focus:ring-brand-500">
+        <label for="exportIncludePhotos" class="text-xs font-medium text-slate-700">Includi foto dei pasti affiancate sulla destra</label>
+      </div>
+
+      <div class="pt-2">
+        <button onclick="generatePDF()" id="btnGeneratePDF" class="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-600/30 transition flex items-center justify-center gap-2 text-sm">
+          <i class="fa-solid fa-download"></i>
+          <span>Scarica Documento PDF</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTAINER NASCOSTO PER RENDERING E GENERAZIONE PDF -->
+  <div id="pdfExportContainer" class="hidden"></div>
+
+
+  <!-- ==================== JAVASCRIPT LOGIC ==================== -->
+  <script>
+    // -------------------------------------------------------------
+    // REGISTRAZIONE SERVICE WORKER & PWA INSTALL PROMPT
+    // -------------------------------------------------------------
+    let deferredPrompt = null;
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('Service Worker registrato con successo:', reg.scope))
+          .catch(err => console.log('Registrazione Service Worker fallita:', err));
+      });
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const btn = document.getElementById('btnInstallPWA');
+      if (btn) btn.classList.remove('hidden');
+    });
+
+    async function installPWA() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          console.log('Utente ha installato la web app!');
+        }
+        deferredPrompt = null;
+        document.getElementById('btnInstallPWA').classList.add('hidden');
+      }
+    }
+
+    // Rileva iOS per mostrare banner guida installazione se aperta in Safari mobile
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    if (isIOS && !isStandalone) {
+      document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('pwaBannerIOS').classList.remove('hidden');
+      });
+    }
+
+    // STATI MENTALI E CONTESTI PREDEFINITI
+    const DEFAULT_MOODS = [
+      "😊 Sereno", "😫 Stressato", "😟 Ansioso", "🥱 Stanco",
+      "🤤 Affamato", "😐 Neutro", "🥳 Felice", "😔 Triste"
+    ];
+
+    const DEFAULT_CONTEXTS = [
+      "⚡ Di fretta", "🧘 Con calma", "💼 Al lavoro", "🏡 A casa",
+      "👥 In compagnia", "👤 Da solo"
+    ];
+
+    let customMoods = [];
+    let customContexts = [];
+    let selectedContexts = ["🧘 Con calma"];
+    let currentPhotoBase64 = null;
+    
+    let expandedStates = {
+      weeks: {},
+      days: {}
+    };
+
+    // -------------------------------------------------------------
+    // DATABASE INDEXEDDB ENGINE
+    // -------------------------------------------------------------
+    const DB_NAME = "DiarioAlimentareDB";
+    const DB_VERSION = 2;
+    let db = null;
+
+    function initDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+        request.onupgradeneeded = (event) => {
+          const db = event.target.result;
+          if (!db.objectStoreNames.contains("meals")) {
+            const mealStore = db.createObjectStore("meals", { keyPath: "id", autoIncrement: true });
+            mealStore.createIndex("datetime", "datetime", { unique: false });
+          }
+          if (!db.objectStoreNames.contains("customMoods")) {
+            db.createObjectStore("customMoods", { keyPath: "name" });
+          }
+          if (!db.objectStoreNames.contains("customContexts")) {
+            db.createObjectStore("customContexts", { keyPath: "name" });
+          }
+        };
+
+        request.onsuccess = (event) => {
+          db = event.target.result;
+          resolve(db);
+        };
+
+        request.onerror = (event) => {
+          console.error("Errore apertura IndexedDB:", event.target.error);
+          reject(event.target.error);
+        };
+      });
+    }
+
+    function getAllMealsFromDB() {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(["meals"], "readonly");
+        const store = transaction.objectStore("meals");
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    function saveMealToDB(meal) {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(["meals"], "readwrite");
+        const store = transaction.objectStore("meals");
+        const request = store.put(meal);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    function deleteMealFromDB(id) {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(["meals"], "readwrite");
+        const store = transaction.objectStore("meals");
+        const request = store.delete(id);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    function getCustomMoodsFromDB() {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(["customMoods"], "readonly");
+        const store = transaction.objectStore("customMoods");
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result.map(m => m.name) || []);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    function saveCustomMoodToDB(moodName) {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(["customMoods"], "readwrite");
+        const store = transaction.objectStore("customMoods");
+        const request = store.put({ name: moodName });
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    function getCustomContextsFromDB() {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(["customContexts"], "readonly");
+        const store = transaction.objectStore("customContexts");
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result.map(c => c.name) || []);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    function saveCustomContextToDB(contextName) {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(["customContexts"], "readwrite");
+        const store = transaction.objectStore("customContexts");
+        const request = store.put({ name: contextName });
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    // -------------------------------------------------------------
+    // INITIALIZATION & APP LOAD
+    // -------------------------------------------------------------
+    document.addEventListener("DOMContentLoaded", async () => {
+      try {
+        await initDB();
+        customMoods = await getCustomMoodsFromDB();
+        customContexts = await getCustomContextsFromDB();
+        updateTodayHeader();
+        renderMoodChips();
+        renderContextChips();
+        await loadAndRenderFeed();
+      } catch (err) {
+        console.error("Errore inizializzazione app:", err);
+      }
+    });
+
+    function updateTodayHeader() {
+      const now = new Date();
+      const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+      const dateStr = now.toLocaleDateString('it-IT', options);
+      document.getElementById('todayDateStr').textContent = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+    }
+
+    // -------------------------------------------------------------
+    // COMPRESSIONE FOTO TRAMITE HTML CANVAS (MAX 800PX, JPEG 0.7)
+    // -------------------------------------------------------------
+    function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.7) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = reject;
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onerror = reject;
+          img.onload = () => {
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > maxWidth) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+              }
+            } else {
+              if (height > maxHeight) {
+                width = Math.round((width * maxHeight) / height);
+                height = maxHeight;
+              }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+            
+            const head = 'data:image/jpeg;base64,';
+            const sizeInBytes = Math.round((compressedDataUrl.length - head.length) * 3 / 4);
+            const sizeInKB = Math.round(sizeInBytes / 1024);
+
+            resolve({ dataUrl: compressedDataUrl, sizeKB: sizeInKB, width, height });
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function handlePhotoSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      try {
+        const result = await compressImage(file);
+        currentPhotoBase64 = result.dataUrl;
+
+        document.getElementById('photoPreview').src = result.dataUrl;
+        document.getElementById('photoMetaInfo').textContent = `${result.width}x${result.height}px (${result.sizeKB} KB)`;
+        document.getElementById('uploadPlaceholder').classList.add('hidden');
+        document.getElementById('photoPreviewContainer').classList.remove('hidden');
+      } catch (err) {
+        alert("Errore nell'elaborazione della foto. Riprova.");
+        console.error(err);
+      }
+    }
+
+    function removePhoto() {
+      currentPhotoBase64 = null;
+      document.getElementById('mealPhotoInput').value = '';
+      document.getElementById('photoPreview').src = '';
+      document.getElementById('uploadPlaceholder').classList.remove('hidden');
+      document.getElementById('photoPreviewContainer').classList.add('hidden');
+    }
+
+    // -------------------------------------------------------------
+    // GESTIONE STATO MENTALE (MOOD)
+    // -------------------------------------------------------------
+    function renderMoodChips(selectedMoodValue = null) {
+      const container = document.getElementById('moodChipsContainer');
+      const allMoods = [...new Set([...DEFAULT_MOODS, ...customMoods])];
+      
+      const currentSelected = selectedMoodValue || document.getElementById('selectedMood').value || allMoods[0];
+
+      container.innerHTML = allMoods.map(mood => {
+        const isSelected = mood === currentSelected;
+        return `
+          <button type="button" onclick="selectMood('${mood}')" 
+            class="mood-chip px-3 py-1.5 rounded-xl text-xs font-semibold transition border ${
+              isSelected 
+                ? 'bg-brand-600 text-white border-brand-600 shadow-sm' 
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+            }">
+            ${mood}
+          </button>
+        `;
+      }).join('');
+
+      document.getElementById('selectedMood').value = currentSelected;
+    }
+
+    function selectMood(mood) {
+      document.getElementById('selectedMood').value = mood;
+      renderMoodChips(mood);
+    }
+
+    function openCustomMoodModal() {
+      document.getElementById('newMoodName').value = '';
+      document.getElementById('newMoodEmoji').value = '✨';
+      document.getElementById('customMoodModal').classList.remove('hidden');
+    }
+
+    function closeCustomMoodModal() {
+      document.getElementById('customMoodModal').classList.add('hidden');
+    }
+
+    async function saveCustomMood() {
+      const emoji = document.getElementById('newMoodEmoji').value.trim() || '✨';
+      const name = document.getElementById('newMoodName').value.trim();
+
+      if (!name) {
+        alert("Inserisci un nome per lo stato mentale.");
+        return;
+      }
+
+      const fullMoodStr = `${emoji} ${name}`;
+      if (!customMoods.includes(fullMoodStr)) {
+        customMoods.push(fullMoodStr);
+        await saveCustomMoodToDB(fullMoodStr);
+      }
+
+      renderMoodChips(fullMoodStr);
+      closeCustomMoodModal();
+    }
+
+    // -------------------------------------------------------------
+    // GESTIONE CONTESTO (SCELTA MULTIPLA + PERSONALIZZABILE)
+    // -------------------------------------------------------------
+    function renderContextChips() {
+      const container = document.getElementById('contextChipsContainer');
+      const allContexts = [...new Set([...DEFAULT_CONTEXTS, ...customContexts])];
+
+      container.innerHTML = allContexts.map(ctx => {
+        const isSelected = selectedContexts.includes(ctx);
+        return `
+          <button type="button" onclick="toggleContext('${ctx.replace(/'/g, "\\'")}')" 
+            class="px-3 py-1.5 rounded-xl text-xs font-semibold transition border flex items-center gap-1.5 ${
+              isSelected 
+                ? 'bg-brand-600 text-white border-brand-600 shadow-sm' 
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+            }">
+            <span>${ctx}</span>
+            ${isSelected ? '<i class="fa-solid fa-check text-[10px]"></i>' : ''}
+          </button>
+        `;
+      }).join('');
+    }
+
+    function toggleContext(ctx) {
+      const idx = selectedContexts.indexOf(ctx);
+      if (idx > -1) {
+        if (selectedContexts.length > 1) {
+          selectedContexts.splice(idx, 1);
+        }
+      } else {
+        selectedContexts.push(ctx);
+      }
+      renderContextChips();
+    }
+
+    function openCustomContextModal() {
+      document.getElementById('newContextName').value = '';
+      document.getElementById('newContextEmoji').value = '📍';
+      document.getElementById('customContextModal').classList.remove('hidden');
+    }
+
+    function closeCustomContextModal() {
+      document.getElementById('customContextModal').classList.add('hidden');
+    }
+
+    async function saveCustomContext() {
+      const emoji = document.getElementById('newContextEmoji').value.trim() || '📍';
+      const name = document.getElementById('newContextName').value.trim();
+
+      if (!name) {
+        alert("Inserisci un nome per il contesto.");
+        return;
+      }
+
+      const fullContextStr = `${emoji} ${name}`;
+      if (!customContexts.includes(fullContextStr)) {
+        customContexts.push(fullContextStr);
+        await saveCustomContextToDB(fullContextStr);
+      }
+
+      if (!selectedContexts.includes(fullContextStr)) {
+        selectedContexts.push(fullContextStr);
+      }
+
+      renderContextChips();
+      closeCustomContextModal();
+    }
+
+    // -------------------------------------------------------------
+    // MODALE GESTIONE PASTO (OPEN / CLOSE / SAVE)
+    // -------------------------------------------------------------
+    function openMealModal(mealToEdit = null) {
+      const modal = document.getElementById('mealModal');
+      
+      if (mealToEdit) {
+        document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-pen text-brand-600"></i> Modifica Pasto';
+        document.getElementById('mealId').value = mealToEdit.id;
+        document.getElementById('mealDateTime').value = mealToEdit.datetime;
+        document.getElementById('mealWeight').value = mealToEdit.weight !== undefined ? mealToEdit.weight : '';
+        document.getElementById('mealDescription').value = mealToEdit.description;
+        
+        selectMood(mealToEdit.mood);
+
+        if (Array.isArray(mealToEdit.context)) {
+          selectedContexts = [...mealToEdit.context];
+        } else if (typeof mealToEdit.context === 'string') {
+          selectedContexts = mealToEdit.context.split(', ').map(s => s.trim());
+        } else {
+          selectedContexts = ["🧘 Con calma"];
+        }
+        renderContextChips();
+
+        if (mealToEdit.photo) {
+          currentPhotoBase64 = mealToEdit.photo;
+          document.getElementById('photoPreview').src = mealToEdit.photo;
+          document.getElementById('photoMetaInfo').textContent = 'Foto Salvata';
+          document.getElementById('uploadPlaceholder').classList.add('hidden');
+          document.getElementById('photoPreviewContainer').classList.remove('hidden');
+        } else {
+          removePhoto();
+        }
+      } else {
+        document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-utensils text-brand-600"></i> Nuova Nota Pasto';
+        document.getElementById('mealId').value = '';
+        
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('mealDateTime').value = now.toISOString().slice(0, 16);
+        
+        document.getElementById('mealWeight').value = '';
+        document.getElementById('mealDescription').value = '';
+        removePhoto();
+        renderMoodChips();
+        
+        selectedContexts = ["🧘 Con calma"];
+        renderContextChips();
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeMealModal() {
+      document.getElementById('mealModal').classList.add('hidden');
+    }
+
+    async function saveMeal(event) {
+      event.preventDefault();
+
+      const idVal = document.getElementById('mealId').value;
+      const datetime = document.getElementById('mealDateTime').value;
+      const weightVal = document.getElementById('mealWeight').value.trim();
+      const mood = document.getElementById('selectedMood').value;
+      const description = document.getElementById('mealDescription').value.trim();
+
+      const mealData = {
+        datetime: datetime,
+        timestamp: new Date(datetime).getTime(),
+        weight: weightVal !== "" ? parseFloat(weightVal) : null,
+        mood: mood,
+        context: selectedContexts.length > 0 ? selectedContexts : ["🧘 Con calma"],
+        description: description,
+        photo: currentPhotoBase64
+      };
+
+      if (idVal) {
+        mealData.id = parseInt(idVal, 10);
+      }
+
+      try {
+        await saveMealToDB(mealData);
+        closeMealModal();
+        await loadAndRenderFeed();
+      } catch (err) {
+        console.error("Errore salvataggio pasto:", err);
+        alert("Errore durante il salvataggio del pasto.");
+      }
+    }
+
+    async function deleteMeal(id) {
+      if (confirm("Sei sicuro di voler eliminare questa nota dal diario?")) {
+        await deleteMealFromDB(id);
+        await loadAndRenderFeed();
+      }
+    }
+
+    async function editMeal(id) {
+      const meals = await getAllMealsFromDB();
+      const meal = meals.find(m => m.id === id);
+      if (meal) {
+        openMealModal(meal);
+      }
+    }
+
+    // -------------------------------------------------------------
+    // RENDERING CRONOLOGICO & STRUTTURA AD FISARMONICA (WEEK > DAY)
+    // -------------------------------------------------------------
+    function getISOWeekAndYear(dateObj) {
+      const d = new Date(Date.UTC(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()));
+      const dayNum = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+      return { year: d.getUTCFullYear(), week: weekNo };
+    }
+
+    function getWeekRangeFormatted(dateObj) {
+      const curr = new Date(dateObj);
+      const first = curr.getDate() - (curr.getDay() === 0 ? 6 : curr.getDay() - 1);
+      const last = first + 6;
+
+      const firstDay = new Date(curr.setDate(first));
+      const lastDay = new Date(curr.setDate(last));
+
+      const opt = { day: 'numeric', month: 'short' };
+      return `${firstDay.toLocaleDateString('it-IT', opt)} - ${lastDay.toLocaleDateString('it-IT', opt)} ${lastDay.getFullYear()}`;
+    }
+
+    async function loadAndRenderFeed() {
+      const container = document.getElementById('feedContainer');
+      const meals = await getAllMealsFromDB();
+
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const todayCount = meals.filter(m => m.datetime && m.datetime.slice(0, 10) === todayStr).length;
+      document.getElementById('todayCountBadge').textContent = `${todayCount} Pasti Oggi`;
+
+      if (meals.length === 0) {
+        container.innerHTML = `
+          <div class="bg-white border border-slate-200 rounded-2xl p-8 text-center space-y-3">
+            <div class="w-16 h-16 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center mx-auto text-2xl">
+              <i class="fa-solid fa-bowl-food"></i>
+            </div>
+            <h3 class="font-bold text-slate-800 text-base">Diario Vuoto</h3>
+            <p class="text-xs text-slate-500 max-w-xs mx-auto">Non hai ancora registrato nessun pasto. Tocca il pulsante in basso per aggiungere la tua prima nota!</p>
+            <button onclick="openMealModal()" class="px-4 py-2 bg-brand-600 text-white font-bold rounded-xl text-xs shadow-md">
+              + Aggiungi il Primo Pasto
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      meals.sort((a, b) => b.timestamp - a.timestamp);
+
+      const weeksGrouped = {};
+
+      meals.forEach(meal => {
+        const mealDate = new Date(meal.datetime);
+        const { year, week } = getISOWeekAndYear(mealDate);
+        const weekKey = `${year}-W${week.toString().padStart(2, '0')}`;
+        const weekRange = getWeekRangeFormatted(mealDate);
+
+        const dayKey = meal.datetime.slice(0, 10);
+        const dayNameOptions = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+        let dayName = mealDate.toLocaleDateString('it-IT', dayNameOptions);
+        dayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+
+        if (!weeksGrouped[weekKey]) {
+          weeksGrouped[weekKey] = {
+            weekKey,
+            weekNum: week,
+            year,
+            range: weekRange,
+            days: {}
+          };
+        }
+
+        if (!weeksGrouped[weekKey].days[dayKey]) {
+          weeksGrouped[weekKey].days[dayKey] = {
+            dayKey,
+            dayName,
+            meals: []
+          };
+        }
+
+        weeksGrouped[weekKey].days[dayKey].meals.push(meal);
+      });
+
+      const sortedWeekKeys = Object.keys(weeksGrouped);
+      if (expandedStates.weeks[sortedWeekKeys[0]] === undefined) {
+        expandedStates.weeks[sortedWeekKeys[0]] = true;
+      }
+
+      let html = '';
+
+      sortedWeekKeys.forEach((wKey) => {
+        const weekData = weeksGrouped[wKey];
+        const isWeekOpen = expandedStates.weeks[wKey] !== false;
+
+        const totalWeekMeals = Object.values(weekData.days).reduce((acc, d) => acc + d.meals.length, 0);
+
+        html += `
+          <!-- ACCORDION SETTIMANA -->
+          <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+            <button onclick="toggleWeekAccordion('${wKey}')" 
+              class="w-full px-4 py-3.5 bg-slate-100/80 hover:bg-slate-200/60 transition flex items-center justify-between border-b border-slate-200/80">
+              <div class="flex items-center gap-2.5">
+                <i class="fa-solid fa-calendar-week text-brand-600 text-sm"></i>
+                <div class="text-left">
+                  <h3 class="font-bold text-slate-800 text-sm leading-tight">Settimana ${weekData.weekNum} (${weekData.year})</h3>
+                  <p class="text-[11px] text-slate-500 font-medium">${weekData.range}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="bg-slate-200/80 text-slate-700 text-[11px] font-bold px-2 py-0.5 rounded-full">
+                  ${totalWeekMeals} ${totalWeekMeals === 1 ? 'pasto' : 'pasti'}
+                </span>
+                <i class="fa-solid fa-chevron-down text-slate-400 text-xs rotate-icon ${isWeekOpen ? 'open' : ''}" id="icon-week-${wKey}"></i>
+              </div>
+            </button>
+
+            <!-- CONTENUTO SETTIMANA -->
+            <div class="accordion-content ${isWeekOpen ? 'active' : ''}" id="content-week-${wKey}">
+              <div class="p-3 space-y-3 bg-slate-50/50">
+        `;
+
+        const dayKeys = Object.keys(weekData.days);
+        dayKeys.forEach((dKey) => {
+          const dayData = weekData.days[dKey];
+          const isDayOpen = expandedStates.days[dKey] !== false;
+
+          html += `
+            <!-- ACCORDION GIORNO -->
+            <div class="bg-white border border-slate-200/90 rounded-xl overflow-hidden shadow-2xs">
+              <button onclick="toggleDayAccordion('${dKey}')" 
+                class="w-full px-3.5 py-2.5 bg-white hover:bg-slate-50 transition flex items-center justify-between border-b border-slate-100">
+                <div class="flex items-center gap-2">
+                  <i class="fa-regular fa-calendar-day text-brand-500 text-xs"></i>
+                  <span class="font-bold text-slate-800 text-xs">${dayData.dayName}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-[10px] font-semibold text-slate-400">${dayData.meals.length} note</span>
+                  <i class="fa-solid fa-chevron-down text-slate-400 text-[10px] rotate-icon ${isDayOpen ? 'open' : ''}" id="icon-day-${dKey}"></i>
+                </div>
+              </button>
+
+              <!-- CONTENUTO GIORNO -->
+              <div class="accordion-content ${isDayOpen ? 'active' : ''}" id="content-day-${dKey}">
+                <div class="p-2.5 space-y-2.5">
+          `;
+
+          dayData.meals.forEach(meal => {
+            const timeStr = meal.datetime.slice(11, 16);
+            const contextsArr = Array.isArray(meal.context) ? meal.context : [meal.context];
+            
+            html += `
+              <!-- SCHEDA SINGOLO PASTO -->
+              <div class="bg-white border border-slate-100 rounded-xl p-3 shadow-sm hover:shadow transition relative">
+                <div class="flex items-start justify-between gap-2 mb-2">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="bg-brand-50 text-brand-700 border border-brand-200/60 font-bold text-[11px] px-2 py-0.5 rounded-lg flex items-center gap-1">
+                      <i class="fa-regular fa-clock text-[10px]"></i> ${timeStr}
+                    </span>
+                    ${meal.weight ? `
+                      <span class="bg-sky-50 text-sky-700 border border-sky-200/60 font-bold text-[11px] px-2 py-0.5 rounded-lg flex items-center gap-1">
+                        <i class="fa-solid fa-weight-scale text-[10px]"></i> ${meal.weight} kg
+                      </span>
+                    ` : ''}
+                    <span class="bg-amber-50 text-amber-800 border border-amber-200/60 font-semibold text-[11px] px-2 py-0.5 rounded-lg">
+                      ${meal.mood}
+                    </span>
+                    ${contextsArr.map(c => `
+                      <span class="bg-slate-100 text-slate-700 font-medium text-[11px] px-2 py-0.5 rounded-lg">
+                        ${c}
+                      </span>
+                    `).join('')}
+                  </div>
+
+                  <div class="flex items-center gap-1">
+                    <button onclick="editMeal(${meal.id})" title="Modifica" class="w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center text-xs">
+                      <i class="fa-solid fa-pen text-[10px]"></i>
+                    </button>
+                    <button onclick="deleteMeal(${meal.id})" title="Elimina" class="w-7 h-7 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center text-xs">
+                      <i class="fa-solid fa-trash text-[10px]"></i>
+                    </button>
+                  </div>
+                </div>
+
+                ${meal.photo ? `
+                  <div class="mb-2.5 overflow-hidden rounded-lg border border-slate-100 max-h-52 bg-slate-900 flex items-center justify-center">
+                    <img src="${meal.photo}" alt="Foto pasto" class="w-full object-cover max-h-52 rounded-lg cursor-pointer hover:scale-105 transition duration-300" onclick="viewFullImage('${meal.photo}')">
+                  </div>
+                ` : ''}
+
+                <p class="text-xs text-slate-800 leading-relaxed font-normal whitespace-pre-line">${escapeHTML(meal.description)}</p>
+              </div>
+            `;
+          });
+
+          html += `
+                </div>
+              </div>
+            </div>
+          `;
+        });
+
+        html += `
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function toggleWeekAccordion(wKey) {
+      const content = document.getElementById(`content-week-${wKey}`);
+      const icon = document.getElementById(`icon-week-${wKey}`);
+      
+      const isOpen = content.classList.contains('active');
+      if (isOpen) {
+        content.classList.remove('active');
+        icon.classList.remove('open');
+        expandedStates.weeks[wKey] = false;
+      } else {
+        content.classList.add('active');
+        icon.classList.add('open');
+        expandedStates.weeks[wKey] = true;
+      }
+    }
+
+    function toggleDayAccordion(dKey) {
+      const content = document.getElementById(`content-day-${dKey}`);
+      const icon = document.getElementById(`icon-day-${dKey}`);
+      
+      const isOpen = content.classList.contains('active');
+      if (isOpen) {
+        content.classList.remove('active');
+        icon.classList.remove('open');
+        expandedStates.days[dKey] = false;
+      } else {
+        content.classList.add('active');
+        icon.classList.add('open');
+        expandedStates.days[dKey] = true;
+      }
+    }
+
+    let allExpanded = false;
+    function toggleExpandAll() {
+      allExpanded = !allExpanded;
+      const contents = document.querySelectorAll('.accordion-content');
+      const icons = document.querySelectorAll('.rotate-icon');
+      const btn = document.getElementById('btnToggleAll');
+
+      contents.forEach(c => {
+        if (allExpanded) c.classList.add('active');
+        else c.classList.remove('active');
+      });
+
+      icons.forEach(i => {
+        if (allExpanded) i.classList.add('open');
+        else i.classList.remove('open');
+      });
+
+      btn.textContent = allExpanded ? "Comprimi tutto" : "Espandi tutto";
+    }
+
+    function escapeHTML(str) {
+      return str.replace(/[&<>'"]/g, 
+        tag => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          "'": '&#39;',
+          '"': '&quot;'
+        }[tag] || tag)
+      );
+    }
+
+    function viewFullImage(src) {
+      const win = window.open("");
+      win.document.write(`<img src="${src}" style="max-width:100%; height:auto; margin:auto; display:block;" />`);
+    }
+
+    // -------------------------------------------------------------
+    // ESPORTAZIONE PDF
+    // -------------------------------------------------------------
+    function openExportModal() {
+      document.getElementById('exportModal').classList.remove('hidden');
+    }
+
+    function closeExportModal() {
+      document.getElementById('exportModal').classList.add('hidden');
+    }
+
+    async function generatePDF() {
+      const weeksVal = document.getElementById('exportWeeksSelect').value;
+      const includePhotos = document.getElementById('exportIncludePhotos').checked;
+      const btn = document.getElementById('btnGeneratePDF');
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generazione PDF in corso...';
+
+      try {
+        let meals = await getAllMealsFromDB();
+        meals.sort((a, b) => b.timestamp - a.timestamp);
+
+        if (weeksVal !== 'all') {
+          const numWeeks = parseInt(weeksVal, 10);
+          const limitTime = Date.now() - (numWeeks * 7 * 24 * 60 * 60 * 1000);
+          meals = meals.filter(m => m.timestamp >= limitTime);
+        }
+
+        if (meals.length === 0) {
+          alert("Nessun pasto trovato nell'intervallo di tempo selezionato.");
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-download"></i> Scarica Documento PDF';
+          return;
+        }
+
+        const pdfContainer = document.getElementById('pdfExportContainer');
+        
+        let pdfHTML = `
+          <div style="font-family: Arial, sans-serif; padding: 25px; color: #0f172a; max-width: 800px; margin: auto; background-color: #ffffff;">
+            <!-- INTESTAZIONE PDF -->
+            <div style="text-align: center; border-bottom: 3px solid #16a34a; padding-bottom: 15px; margin-bottom: 25px;">
+              <h1 style="color: #15803d; margin: 0; font-size: 26px; font-weight: bold; letter-spacing: 0.5px;">DIARIO ALIMENTARE</h1>
+              <p style="margin: 6px 0 0; font-size: 13px; color: #64748b;">Esportato il ${new Date().toLocaleDateString('it-IT')} | Filtro: ${weeksVal === 'all' ? 'Tutto il diario' : 'Ultime ' + weeksVal + ' settimane'}</p>
+            </div>
+            
+            <div>
+        `;
+
+        const dayGroups = {};
+        meals.forEach(m => {
+          const dayKey = m.datetime.slice(0, 10);
+          const dayName = new Date(m.datetime).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+          if (!dayGroups[dayKey]) {
+            dayGroups[dayKey] = { name: dayName.charAt(0).toUpperCase() + dayName.slice(1), items: [] };
+          }
+          dayGroups[dayKey].items.push(m);
+        });
+
+        Object.keys(dayGroups).forEach(dKey => {
+          const group = dayGroups[dKey];
+          pdfHTML += `
+            <div style="margin-bottom: 25px; page-break-inside: avoid;">
+              <h2 style="font-size: 17px; font-weight: bold; color: #0f172a; background-color: #f1f5f9; padding: 10px 14px; border-radius: 8px; border-left: 5px solid #16a34a; margin: 0 0 12px 0;">
+                ${group.name}
+              </h2>
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+          `;
+
+          group.items.forEach(meal => {
+            const timeStr = meal.datetime.slice(11, 16);
+            const contextsStr = Array.isArray(meal.context) ? meal.context.join(', ') : meal.context;
+            
+            pdfHTML += `
+              <div style="border: 1px solid #cbd5e1; border-radius: 10px; padding: 14px; background: #ffffff; display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+                
+                <div style="flex: 1; min-width: 0;">
+                  <div style="margin-bottom: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+                    <span style="font-size: 14px; font-weight: bold; color: #15803d; background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 3px 8px; border-radius: 6px;">
+                      ⏰ ${timeStr}
+                    </span>
+                    
+                    ${meal.weight ? `
+                      <span style="font-size: 14px; font-weight: bold; color: #0369a1; background-color: #f0f9ff; border: 1px solid #bae6fd; padding: 3px 8px; border-radius: 6px;">
+                        ⚖️ ${meal.weight} kg
+                      </span>
+                    ` : ''}
+
+                    <span style="font-size: 13px; font-weight: bold; color: #92400e; background-color: #fef3c7; border: 1px solid #fde68a; padding: 3px 8px; border-radius: 6px;">
+                      ${meal.mood}
+                    </span>
+
+                    <span style="font-size: 13px; font-weight: font-medium; color: #334155; background-color: #f1f5f9; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 6px;">
+                      ${contextsStr}
+                    </span>
+                  </div>
+
+                  <p style="font-size: 15px; line-height: 1.5; color: #1e293b; margin: 0; font-weight: 500; whitespace-pre-line;">
+                    ${escapeHTML(meal.description)}
+                  </p>
+                </div>
+
+                ${(includePhotos && meal.photo) ? `
+                  <div style="width: 150px; flex-shrink: 0; text-align: right;">
+                    <img src="${meal.photo}" style="width: 150px; height: 110px; object-fit: cover; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 1px 3px rgba(0,0,0,0.1);" />
+                  </div>
+                ` : ''}
+
+              </div>
+            `;
+          });
+
+          html += `
+              </div>
+            </div>
+          `;
+        });
+
+        pdfHTML += `</div></div>`;
+
+        pdfContainer.innerHTML = pdfHTML;
+
+        const opt = {
+          margin:       0.4,
+          filename:     `diario_alimentare_${new Date().toISOString().slice(0, 10)}.pdf`,
+          image:        { type: 'jpeg', quality: 0.95 },
+          html2canvas:  { scale: 2, useCORS: true },
+          jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+
+        await html2pdf().set(opt).from(pdfContainer.children[0]).save();
+
+        closeExportModal();
+      } catch (err) {
+        console.error("Errore generazione PDF:", err);
+        alert("Si è verificato un errore durante la generazione del PDF.");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-download"></i> Scarica Documento PDF';
+      }
+    }
+  </script>
+</body>
+</html>
