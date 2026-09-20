@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Diario Alimentare v1.4.0</title>
+  <title>Diario Alimentare v1.5.0</title>
 
   <!-- PWA MANIFEST & MOBILE WEB APP METADATA -->
   <link rel="manifest" href="manifest.json">
@@ -87,7 +87,7 @@
         <div>
           <div class="flex items-center gap-1.5">
             <h1 class="font-bold text-slate-900 text-lg leading-tight">Diario Alimentare</h1>
-            <span onclick="forceAppUpdate()" title="Clicca per forzare l'aggiornamento" class="cursor-pointer bg-brand-100 text-brand-800 font-bold text-[10px] px-1.5 py-0.5 rounded-md hover:bg-brand-200 transition">v1.4.0</span>
+            <span onclick="forceAppUpdate()" title="Clicca per forzare l'aggiornamento" class="cursor-pointer bg-brand-100 text-brand-800 font-bold text-[10px] px-1.5 py-0.5 rounded-md hover:bg-brand-200 transition">v1.5.0</span>
           </div>
           <p class="text-xs text-slate-500 font-medium">I tuoi pasti quotidiani</p>
         </div>
@@ -163,7 +163,7 @@
 
     <!-- FOOTER CON VERSIONE E FORCE UPDATE -->
     <footer class="mt-8 text-center pb-6 text-slate-400 text-xs space-y-1">
-      <p class="font-medium">Diario Alimentare PWA <span class="font-bold text-slate-600">v1.4.0</span></p>
+      <p class="font-medium">Diario Alimentare PWA <span class="font-bold text-slate-600">v1.5.0</span></p>
       <button onclick="forceAppUpdate()" class="text-[11px] font-semibold text-brand-600 hover:underline flex items-center justify-center gap-1 mx-auto">
         <i class="fa-solid fa-rotate"></i> Verifica / Forza Aggiornamento
       </button>
@@ -373,24 +373,49 @@
     </div>
   </div>
 
-  <!-- ==================== MODALE ESPORTAZIONE PDF ==================== -->
+  <!-- ==================== MODALE AGGIUNGI INDIRIZZO EMAIL SALVATO ==================== -->
+  <div id="addEmailModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-xs rounded-2xl p-5 shadow-2xl space-y-4">
+      <h4 class="font-bold text-slate-900 text-base flex items-center gap-2">
+        <i class="fa-solid fa-envelope text-brand-600"></i>
+        <span>Aggiungi Email Destinatario</span>
+      </h4>
+      <p class="text-xs text-slate-500">Inserisci un indirizzo email (es. nutrizionista, medico) che rimarrà salvato nell'app.</p>
+
+      <div>
+        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Indirizzo Email</label>
+        <input type="email" id="newEmailAddress" placeholder="Es. nutrizionista@studio.it" required
+          class="w-full p-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+
+      <div class="flex gap-2 pt-2">
+        <button type="button" onclick="closeAddEmailModal()" class="flex-1 py-2.5 bg-slate-100 text-slate-700 font-semibold rounded-xl text-xs">
+          Annulla
+        </button>
+        <button type="button" onclick="saveNewEmail()" class="flex-1 py-2.5 bg-brand-600 text-white font-bold rounded-xl text-xs shadow-md">
+          Salva Email
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODALE ESPORTAZIONE PDF & INVIO EMAIL ==================== -->
   <div id="exportModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl space-y-4">
+    <div class="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center border-b border-slate-100 pb-3">
         <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
           <i class="fa-solid fa-file-pdf text-red-500"></i>
-          <span>Esporta Diario in PDF</span>
+          <span>Esporta & Invia PDF</span>
         </h3>
         <button onclick="closeExportModal()" class="text-slate-400 hover:text-slate-600">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
-      <p class="text-xs text-slate-600">Seleziona quante settimane di diario desideri includere nel documento PDF esportato.</p>
-
-      <div class="space-y-2">
+      <!-- 1. SELEZIONE INTERVALLO TEMPORALE -->
+      <div class="space-y-1.5">
         <label class="block text-xs font-bold text-slate-700 uppercase">Intervallo di Tempo</label>
-        <select id="exportWeeksSelect" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-sm text-slate-800 outline-none focus:ring-2 focus:ring-brand-500">
+        <select id="exportWeeksSelect" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-xs text-slate-800 outline-none focus:ring-2 focus:ring-brand-500">
           <option value="1">Ultima 1 Settimana</option>
           <option value="2">Ultime 2 Settimane</option>
           <option value="4" selected>Ultime 4 Settimane (1 Mese)</option>
@@ -399,18 +424,41 @@
         </select>
       </div>
 
-      <div class="flex items-center gap-2 pt-1">
+      <!-- 2. OPZIONE FOTO -->
+      <div class="flex items-center gap-2">
         <input type="checkbox" id="exportIncludePhotos" checked class="w-4 h-4 text-brand-600 rounded focus:ring-brand-500">
-        <label for="exportIncludePhotos" class="text-xs font-medium text-slate-700">Includi foto dei pasti affiancate sulla destra</label>
+        <label for="exportIncludePhotos" class="text-xs font-medium text-slate-700">Includi foto dei pasti affiancate</label>
       </div>
 
+      <!-- 3. INDIRIZZI EMAIL SALVATI -->
+      <div class="border-t border-slate-100 pt-3 space-y-2">
+        <div class="flex justify-between items-center">
+          <label class="block text-xs font-bold text-slate-700 uppercase">
+            Invia a Destinatario Email
+          </label>
+          <button type="button" onclick="openAddEmailModal()" class="text-xs font-semibold text-brand-600 hover:underline flex items-center gap-1">
+            <i class="fa-solid fa-plus text-[10px]"></i> Aggiungi Email
+          </button>
+        </div>
+
+        <div id="savedEmailsContainer" class="flex flex-col gap-1.5 max-h-32 overflow-y-auto p-1 bg-slate-50 border border-slate-200 rounded-xl">
+          <!-- Renderizzato dinamicamente -->
+        </div>
+      </div>
+
+      <!-- ACTION BUTTONS -->
       <div class="space-y-2 pt-2">
-        <button onclick="generatePDF(false)" id="btnGeneratePDF" class="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-600/30 transition flex items-center justify-center gap-2 text-sm">
+        <button onclick="sendPDFViaEmail()" id="btnSendEmailPDF" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-lg shadow-brand-600/30 transition flex items-center justify-center gap-2 text-sm">
+          <i class="fa-solid fa-paper-plane"></i>
+          <span>Invia PDF via Email</span>
+        </button>
+
+        <button onclick="generatePDF(false)" id="btnGeneratePDF" class="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-md transition flex items-center justify-center gap-2 text-xs">
           <i class="fa-solid fa-file-arrow-down"></i>
           <span>Scarica PDF Diretto</span>
         </button>
 
-        <button onclick="generatePDF(true)" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition flex items-center justify-center gap-2 text-xs border border-slate-200">
+        <button onclick="generatePDF(true)" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition flex items-center justify-center gap-2 text-xs border border-slate-200">
           <i class="fa-solid fa-print"></i>
           <span>Stampa / Salva in PDF (Sistema)</span>
         </button>
@@ -418,7 +466,7 @@
     </div>
   </div>
 
-  <!-- CONTAINER OFFSCREEN PER RENDERING E GENERAZIONE PDF (OPACITY DINAMICA IN JS PER PERMETTERE CATTURA COMPLETA) -->
+  <!-- CONTAINER OFFSCREEN PER RENDERING E GENERAZIONE PDF -->
   <div id="pdfExportContainer" style="position: fixed; top: 0; left: 0; z-index: -9999; opacity: 0.01; width: 750px; background-color: #ffffff; pointer-events: none;"></div>
 
 
@@ -489,7 +537,7 @@
       });
     }
 
-    // STATI MENTALI E CONTESTI PREDEFINITI
+    // STATI MENTALI, CONTESTI ED EMAIL PREDEFINITI
     const DEFAULT_MOODS = [
       "😊 Sereno", "😫 Stressato", "😟 Ansioso", "🥱 Stanco",
       "🤤 Affamato", "😐 Neutro", "🥳 Felice", "😔 Triste"
@@ -502,6 +550,8 @@
 
     let customMoods = [];
     let customContexts = [];
+    let savedEmails = [];
+    let selectedEmailRecipient = "";
     let selectedContexts = ["🧘 Con calma"];
     let currentPhotoBase64 = null;
     
@@ -511,10 +561,10 @@
     };
 
     // -------------------------------------------------------------
-    // DATABASE INDEXEDDB ENGINE
+    // DATABASE INDEXEDDB ENGINE (VERSIONE 3 CON STORE savedEmails)
     // -------------------------------------------------------------
     const DB_NAME = "DiarioAlimentareDB";
-    const DB_VERSION = 2;
+    const DB_VERSION = 3;
     let db = null;
 
     function initDB() {
@@ -532,6 +582,9 @@
           }
           if (!db.objectStoreNames.contains("customContexts")) {
             db.createObjectStore("customContexts", { keyPath: "name" });
+          }
+          if (!db.objectStoreNames.contains("savedEmails")) {
+            db.createObjectStore("savedEmails", { keyPath: "email" });
           }
         };
 
@@ -617,6 +670,36 @@
       });
     }
 
+    function getSavedEmailsFromDB() {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(["savedEmails"], "readonly");
+        const store = transaction.objectStore("savedEmails");
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result.map(e => e.email) || []);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    function saveEmailToDB(emailStr) {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(["savedEmails"], "readwrite");
+        const store = transaction.objectStore("savedEmails");
+        const request = store.put({ email: emailStr });
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    function deleteEmailFromDB(emailStr) {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(["savedEmails"], "readwrite");
+        const store = transaction.objectStore("savedEmails");
+        const request = store.delete(emailStr);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    }
+
     // -------------------------------------------------------------
     // INITIALIZATION & APP LOAD
     // -------------------------------------------------------------
@@ -625,9 +708,11 @@
         await initDB();
         customMoods = await getCustomMoodsFromDB();
         customContexts = await getCustomContextsFromDB();
+        savedEmails = await getSavedEmailsFromDB();
         updateTodayHeader();
         renderMoodChips();
         renderContextChips();
+        renderSavedEmailChips();
         await loadAndRenderFeed();
       } catch (err) {
         console.error("Errore inizializzazione app:", err);
@@ -840,6 +925,88 @@
 
       renderContextChips();
       closeCustomContextModal();
+    }
+
+    // -------------------------------------------------------------
+    // GESTIONE INDIRIZZI EMAIL SALVATI PER INVIO PDF
+    // -------------------------------------------------------------
+    function renderSavedEmailChips() {
+      const container = document.getElementById('savedEmailsContainer');
+      
+      if (savedEmails.length === 0) {
+        container.innerHTML = `
+          <div class="text-[11px] text-slate-400 p-2 text-center">
+            Nessuna email salvata. Clicca <strong>"+ Aggiungi Email"</strong> per inserire un destinatario (es. nutrizionista).
+          </div>
+        `;
+        selectedEmailRecipient = "";
+        return;
+      }
+
+      if (!selectedEmailRecipient || !savedEmails.includes(selectedEmailRecipient)) {
+        selectedEmailRecipient = savedEmails[0];
+      }
+
+      container.innerHTML = savedEmails.map(em => {
+        const isSelected = em === selectedEmailRecipient;
+        return `
+          <div class="flex items-center justify-between p-2 rounded-lg text-xs font-medium border transition ${
+            isSelected ? 'bg-brand-50 border-brand-500 text-brand-900 font-bold' : 'bg-white border-slate-200 text-slate-700'
+          }">
+            <button type="button" onclick="selectEmailRecipient('${em}')" class="flex-1 text-left flex items-center gap-2">
+              <i class="fa-regular ${isSelected ? 'fa-circle-check text-brand-600' : 'fa-circle text-slate-300'} text-xs"></i>
+              <span class="truncate">${em}</span>
+            </button>
+            <button type="button" onclick="deleteSavedEmail('${em}')" class="text-slate-400 hover:text-red-500 px-1 text-xs" title="Elimina email salvata">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectEmailRecipient(em) {
+      selectedEmailRecipient = em;
+      renderSavedEmailChips();
+    }
+
+    function openAddEmailModal() {
+      document.getElementById('newEmailAddress').value = '';
+      document.getElementById('addEmailModal').classList.remove('hidden');
+    }
+
+    function closeAddEmailModal() {
+      document.getElementById('addEmailModal').classList.add('hidden');
+    }
+
+    async function saveNewEmail() {
+      const emailInput = document.getElementById('newEmailAddress').value.trim();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      if (!emailRegex.test(emailInput)) {
+        alert("Inserisci un indirizzo email valido (es. nome@dominio.it).");
+        return;
+      }
+
+      if (!savedEmails.includes(emailInput)) {
+        savedEmails.push(emailInput);
+        await saveEmailToDB(emailInput);
+      }
+
+      selectedEmailRecipient = emailInput;
+      renderSavedEmailChips();
+      closeAddEmailModal();
+    }
+
+    async function deleteSavedEmail(em) {
+      if (confirm(`Eliminare l'indirizzo "${em}" dai salvati?`)) {
+        savedEmails = savedEmails.filter(item => item !== em);
+        await deleteEmailFromDB(em);
+        if (selectedEmailRecipient === em) {
+          selectedEmailRecipient = savedEmails.length > 0 ? savedEmails[0] : "";
+        }
+        renderSavedEmailChips();
+      }
     }
 
     // -------------------------------------------------------------
@@ -1229,9 +1396,10 @@
     }
 
     // -------------------------------------------------------------
-    // ESPORTAZIONE PDF CON CORREZIONE OPACITÀ HTML2CANVAS & OPZIONE STAMPA
+    // ESPORTAZIONE PDF E INVIO EMAIL CON WEB SHARE API / MAILTO
     // -------------------------------------------------------------
     function openExportModal() {
+      renderSavedEmailChips();
       document.getElementById('exportModal').classList.remove('hidden');
     }
 
@@ -1239,170 +1407,208 @@
       document.getElementById('exportModal').classList.add('hidden');
     }
 
-    async function generatePDF(useNativePrint = false) {
+    async function buildPDFBlob() {
       const weeksVal = document.getElementById('exportWeeksSelect').value;
       const includePhotos = document.getElementById('exportIncludePhotos').checked;
-      const btn = document.getElementById('btnGeneratePDF');
 
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparazione PDF...';
+      let meals = await getAllMealsFromDB();
+      meals.sort((a, b) => b.timestamp - a.timestamp);
+
+      if (weeksVal !== 'all') {
+        const numWeeks = parseInt(weeksVal, 10);
+        const limitTime = Date.now() - (numWeeks * 7 * 24 * 60 * 60 * 1000);
+        meals = meals.filter(m => m.timestamp >= limitTime);
+      }
+
+      if (meals.length === 0) {
+        alert("Nessun pasto trovato nell'intervallo di tempo selezionato.");
+        return null;
+      }
 
       const pdfContainer = document.getElementById('pdfExportContainer');
+      
+      let pdfHTML = `
+        <div id="pdfContentWrapper" style="font-family: Arial, sans-serif; padding: 25px; color: #0f172a; width: 700px; background-color: #ffffff; opacity: 1;">
+          <div style="text-align: center; border-bottom: 3px solid #16a34a; padding-bottom: 15px; margin-bottom: 25px;">
+            <h1 style="color: #15803d; margin: 0; font-size: 26px; font-weight: bold; letter-spacing: 0.5px;">DIARIO ALIMENTARE</h1>
+            <p style="margin: 6px 0 0; font-size: 13px; color: #64748b;">Esportato il ${new Date().toLocaleDateString('it-IT')} | Filtro: ${weeksVal === 'all' ? 'Tutto il diario' : 'Ultime ' + weeksVal + ' settimane'}</p>
+          </div>
+          <div>
+      `;
 
-      try {
-        let meals = await getAllMealsFromDB();
-        meals.sort((a, b) => b.timestamp - a.timestamp);
-
-        if (weeksVal !== 'all') {
-          const numWeeks = parseInt(weeksVal, 10);
-          const limitTime = Date.now() - (numWeeks * 7 * 24 * 60 * 60 * 1000);
-          meals = meals.filter(m => m.timestamp >= limitTime);
+      const dayGroups = {};
+      meals.forEach(m => {
+        const dayKey = m.datetime.slice(0, 10);
+        const dayName = new Date(m.datetime).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        if (!dayGroups[dayKey]) {
+          dayGroups[dayKey] = { name: dayName.charAt(0).toUpperCase() + dayName.slice(1), items: [] };
         }
+        dayGroups[dayKey].items.push(m);
+      });
 
-        if (meals.length === 0) {
-          alert("Nessun pasto trovato nell'intervallo di tempo selezionato.");
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-file-arrow-down"></i> Scarica PDF Diretto';
-          return;
-        }
-
-        let pdfHTML = `
-          <div id="pdfContentWrapper" style="font-family: Arial, sans-serif; padding: 25px; color: #0f172a; width: 700px; background-color: #ffffff; opacity: 1;">
-            <!-- INTESTAZIONE PDF -->
-            <div style="text-align: center; border-bottom: 3px solid #16a34a; padding-bottom: 15px; margin-bottom: 25px;">
-              <h1 style="color: #15803d; margin: 0; font-size: 26px; font-weight: bold; letter-spacing: 0.5px;">DIARIO ALIMENTARE</h1>
-              <p style="margin: 6px 0 0; font-size: 13px; color: #64748b;">Esportato il ${new Date().toLocaleDateString('it-IT')} | Filtro: ${weeksVal === 'all' ? 'Tutto il diario' : 'Ultime ' + weeksVal + ' settimane'}</p>
-            </div>
-            
-            <div>
+      Object.keys(dayGroups).forEach(dKey => {
+        const group = dayGroups[dKey];
+        pdfHTML += `
+          <div style="margin-bottom: 25px; page-break-inside: avoid;">
+            <h2 style="font-size: 17px; font-weight: bold; color: #0f172a; background-color: #f1f5f9; padding: 10px 14px; border-radius: 8px; border-left: 5px solid #16a34a; margin: 0 0 12px 0;">
+              ${group.name}
+            </h2>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
         `;
 
-        const dayGroups = {};
-        meals.forEach(m => {
-          const dayKey = m.datetime.slice(0, 10);
-          const dayName = new Date(m.datetime).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-          if (!dayGroups[dayKey]) {
-            dayGroups[dayKey] = { name: dayName.charAt(0).toUpperCase() + dayName.slice(1), items: [] };
-          }
-          dayGroups[dayKey].items.push(m);
-        });
-
-        Object.keys(dayGroups).forEach(dKey => {
-          const group = dayGroups[dKey];
+        group.items.forEach(meal => {
+          const timeStr = meal.datetime.slice(11, 16);
+          const contextsStr = Array.isArray(meal.context) ? meal.context.join(', ') : meal.context;
+          
           pdfHTML += `
-            <div style="margin-bottom: 25px; page-break-inside: avoid;">
-              <h2 style="font-size: 17px; font-weight: bold; color: #0f172a; background-color: #f1f5f9; padding: 10px 14px; border-radius: 8px; border-left: 5px solid #16a34a; margin: 0 0 12px 0;">
-                ${group.name}
-              </h2>
-              <div style="display: flex; flex-direction: column; gap: 12px;">
-          `;
-
-          group.items.forEach(meal => {
-            const timeStr = meal.datetime.slice(11, 16);
-            const contextsStr = Array.isArray(meal.context) ? meal.context.join(', ') : meal.context;
-            
-            pdfHTML += `
-              <div style="border: 1px solid #cbd5e1; border-radius: 10px; padding: 14px; background: #ffffff; display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); page-break-inside: avoid;">
-                
-                <div style="flex: 1; min-width: 0;">
-                  <div style="margin-bottom: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
-                    <span style="font-size: 14px; font-weight: bold; color: #15803d; background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 3px 8px; border-radius: 6px;">
-                      ⏰ ${timeStr}
+            <div style="border: 1px solid #cbd5e1; border-radius: 10px; padding: 14px; background: #ffffff; display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); page-break-inside: avoid;">
+              <div style="flex: 1; min-width: 0;">
+                <div style="margin-bottom: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+                  <span style="font-size: 14px; font-weight: bold; color: #15803d; background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 3px 8px; border-radius: 6px;">
+                    ⏰ ${timeStr}
+                  </span>
+                  ${(meal.weight !== null && meal.weight !== undefined && meal.weight !== '') ? `
+                    <span style="font-size: 14px; font-weight: bold; color: #0369a1; background-color: #f0f9ff; border: 1px solid #bae6fd; padding: 3px 8px; border-radius: 6px;">
+                      ⚖️ ${meal.weight} kg
                     </span>
-                    
-                    ${(meal.weight !== null && meal.weight !== undefined && meal.weight !== '') ? `
-                      <span style="font-size: 14px; font-weight: bold; color: #0369a1; background-color: #f0f9ff; border: 1px solid #bae6fd; padding: 3px 8px; border-radius: 6px;">
-                        ⚖️ ${meal.weight} kg
-                      </span>
-                    ` : ''}
-
-                    <span style="font-size: 13px; font-weight: bold; color: #92400e; background-color: #fef3c7; border: 1px solid #fde68a; padding: 3px 8px; border-radius: 6px;">
-                      ${meal.mood}
-                    </span>
-
-                    <span style="font-size: 13px; font-weight: 500; color: #334155; background-color: #f1f5f9; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 6px;">
-                      ${contextsStr}
-                    </span>
-                  </div>
-
-                  <p style="font-size: 15px; line-height: 1.5; color: #1e293b; margin: 0; font-weight: 500; whitespace-pre-line;">
-                    ${escapeHTML(meal.description)}
-                  </p>
+                  ` : ''}
+                  <span style="font-size: 13px; font-weight: bold; color: #92400e; background-color: #fef3c7; border: 1px solid #fde68a; padding: 3px 8px; border-radius: 6px;">
+                    ${meal.mood}
+                  </span>
+                  <span style="font-size: 13px; font-weight: 500; color: #334155; background-color: #f1f5f9; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 6px;">
+                    ${contextsStr}
+                  </span>
                 </div>
-
-                ${(includePhotos && meal.photo) ? `
-                  <div style="width: 140px; flex-shrink: 0; text-align: right;">
-                    <img src="${meal.photo}" style="width: 140px; height: 105px; object-fit: cover; border-radius: 8px; border: 1px solid #cbd5e1;" />
-                  </div>
-                ` : ''}
-
+                <p style="font-size: 15px; line-height: 1.5; color: #1e293b; margin: 0; font-weight: 500; whitespace-pre-line;">
+                  ${escapeHTML(meal.description)}
+                </p>
               </div>
-            `;
-          });
-
-          pdfHTML += `
-              </div>
+              ${(includePhotos && meal.photo) ? `
+                <div style="width: 140px; flex-shrink: 0; text-align: right;">
+                  <img src="${meal.photo}" style="width: 140px; height: 105px; object-fit: cover; border-radius: 8px; border: 1px solid #cbd5e1;" />
+                </div>
+              ` : ''}
             </div>
           `;
         });
 
         pdfHTML += `</div></div>`;
+      });
 
-        pdfContainer.innerHTML = pdfHTML;
+      pdfHTML += `</div></div>`;
 
-        // Impostiamo opacità piena durante l'elaborazione così html2canvas non genera una pagina trasparente/vuota
-        pdfContainer.style.opacity = '1';
-        pdfContainer.style.zIndex = '99999';
+      pdfContainer.innerHTML = pdfHTML;
+      pdfContainer.style.opacity = '1';
+      pdfContainer.style.zIndex = '99999';
 
-        const targetEl = document.getElementById('pdfContentWrapper') || pdfContainer;
+      const targetEl = document.getElementById('pdfContentWrapper') || pdfContainer;
 
-        const imgs = targetEl.querySelectorAll('img');
-        if (imgs.length > 0) {
-          await Promise.all(Array.from(imgs).map(img => {
-            if (img.complete) return Promise.resolve();
-            return new Promise(res => { img.onload = res; img.onerror = res; });
-          }));
-        }
+      const imgs = targetEl.querySelectorAll('img');
+      if (imgs.length > 0) {
+        await Promise.all(Array.from(imgs).map(img => {
+          if (img.complete) return Promise.resolve();
+          return new Promise(res => { img.onload = res; img.onerror = res; });
+        }));
+      }
+
+      const opt = {
+        margin:       0.3,
+        filename:     `diario_alimentare_${new Date().toISOString().slice(0, 10)}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, allowTaint: true, logging: false },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+      };
+
+      const pdfBlob = await html2pdf().set(opt).from(targetEl).output('blob');
+      
+      pdfContainer.style.opacity = '0.01';
+      pdfContainer.style.zIndex = '-9999';
+
+      return { blob: pdfBlob, filename: opt.filename };
+    }
+
+    async function generatePDF(useNativePrint = false) {
+      const btn = document.getElementById('btnGeneratePDF');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparazione PDF...';
+
+      try {
+        const result = await buildPDFBlob();
+        if (!result) return;
 
         if (useNativePrint) {
           closeExportModal();
-          setTimeout(() => {
-            window.print();
-            pdfContainer.style.opacity = '0.01';
-            pdfContainer.style.zIndex = '-9999';
-          }, 300);
+          setTimeout(() => { window.print(); }, 300);
         } else {
-          if (typeof html2pdf === 'undefined') {
-            closeExportModal();
-            setTimeout(() => { window.print(); }, 300);
-            return;
-          }
-
+          // Download diretto tramite html2pdf
+          const targetEl = document.getElementById('pdfContentWrapper') || document.getElementById('pdfExportContainer');
           const opt = {
             margin:       0.3,
-            filename:     `diario_alimentare_${new Date().toISOString().slice(0, 10)}.pdf`,
+            filename:     result.filename,
             image:        { type: 'jpeg', quality: 0.98 },
             html2canvas:  { scale: 2, useCORS: true, allowTaint: true, logging: false },
             jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
           };
-
           await html2pdf().set(opt).from(targetEl).save();
-          
-          pdfContainer.style.opacity = '0.01';
-          pdfContainer.style.zIndex = '-9999';
           closeExportModal();
         }
-
       } catch (err) {
         console.error("Errore generazione PDF:", err);
-        pdfContainer.style.opacity = '0.01';
-        pdfContainer.style.zIndex = '-9999';
-        alert("Errore generazione PDF. Tentativo con la stampa di sistema...");
-        closeExportModal();
-        setTimeout(() => { window.print(); }, 300);
+        alert("Si è verificato un errore durante il download diretto.");
       } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-file-arrow-down"></i> Scarica PDF Diretto';
+      }
+    }
+
+    async function sendPDFViaEmail() {
+      const btn = document.getElementById('btnSendEmailPDF');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generazione ed Invio...';
+
+      try {
+        const result = await buildPDFBlob();
+        if (!result) return;
+
+        const recipientEmail = selectedEmailRecipient || (savedEmails.length > 0 ? savedEmails[0] : "");
+        const file = new File([result.blob], result.filename, { type: 'application/pdf' });
+
+        // 1. Prova prima con Web Share API (funziona nativamente su smartphone Android/iOS aprendo l'app Email con PDF allegato)
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            title: 'Diario Alimentare',
+            text: `In allegato il Diario Alimentare${recipientEmail ? ' per ' + recipientEmail : ''}.`,
+            files: [file]
+          });
+          closeExportModal();
+        } else {
+          // 2. Fallback Mailto + Download PDF automatico per allegarlo manualmente
+          const subject = encodeURIComponent('Diario Alimentare PDF');
+          const body = encodeURIComponent(`Ciao,\n\nin allegato trovi il mio diario alimentare in PDF per il periodo richiesto.\n\nCordiali saluti.`);
+          const mailtoUrl = `mailto:${recipientEmail}?subject=${subject}&body=${body}`;
+          
+          alert("L'app di posta si aprirà con l'indirizzo destinatario. Il file PDF verrà scaricato per essere allegato.");
+          
+          window.location.href = mailtoUrl;
+
+          // Avvia anche il download del PDF
+          const targetEl = document.getElementById('pdfContentWrapper') || document.getElementById('pdfExportContainer');
+          const opt = {
+            margin:       0.3,
+            filename:     result.filename,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true, allowTaint: true, logging: false },
+            jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+          };
+          await html2pdf().set(opt).from(targetEl).save();
+          closeExportModal();
+        }
+      } catch (err) {
+        console.error("Errore invio email:", err);
+        alert("Errore nell'invio dell'email. Prova a scaricare il PDF direttamente.");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Invia PDF via Email';
       }
     }
   </script>
